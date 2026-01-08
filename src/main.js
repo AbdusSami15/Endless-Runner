@@ -1,20 +1,27 @@
-(function () {
-  const config = {
-    type: Phaser.AUTO,
-    parent: "game",
-    width: BASE_W,
-    height: BASE_H,
-    backgroundColor: "#0b0f14",
-    physics: {
-      default: "arcade",
-      arcade: { debug: false }
-    },
-    scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH
-    },
-    scene: [BootScene, PreloadScene, MenuScene, GameScene, UIScene]
-  };
+window.game = new Phaser.Game({
+  type: Phaser.AUTO,
+  parent: "game",
+  backgroundColor: "#0b0f14",
 
-  new Phaser.Game(config);
-})();
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: BASE_W,
+    height: BASE_H
+  },
+
+  physics: {
+    default: "arcade",
+    arcade: {
+      debug: false
+    }
+  },
+
+  scene: [
+    BootScene,
+    PreloadScene,
+    MenuScene,
+    GameScene,
+    UIScene
+  ]
+});

@@ -1,7 +1,7 @@
 window.MenuScene = class MenuScene extends Phaser.Scene {
   constructor() {
     super("MenuScene");
-    this._modal = null;
+    this._rotateOverlay = null;
   }
 
   create() {
@@ -10,181 +10,121 @@ window.MenuScene = class MenuScene extends Phaser.Scene {
     const cx = BASE_W / 2;
     const cy = BASE_H / 2;
 
-    this.add.text(cx, cy - 170, "ENDLESS RUNNER", {
+    this.add.text(cx, cy - 140, "ENDLESS RUNNER", {
       fontSize: "56px",
       color: "#ffffff",
       fontStyle: "700"
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy - 90, "Tap / Click to Jump\nAvoid Obstacles\nSurvive & Score", {
-      fontSize: "28px",
+    this.add.text(cx, cy - 70, "Tap / Click to Jump\nAvoid Obstacles\nSurvive & Score", {
+      fontSize: "26px",
       color: "#cbd5e1",
       align: "center",
       lineSpacing: 10
     }).setOrigin(0.5);
 
-    this.hsText = this.add.text(cx, cy + 40, `High Score: ${loadHighScore()}`, {
-      fontSize: "28px",
+    this.add.text(cx, cy + 30, `High Score: ${loadHighScore()}`, {
+      fontSize: "26px",
       color: "#a5b4fc"
     }).setOrigin(0.5);
 
-    const startBtn = this.makeButton(cx, cy + 150, 380, 84, 0x2563eb, "START");
-    startBtn.onClick(async () => {
-      await this.tryFullscreenAndLandscape();
+    const startBtn = this.makeButton(cx, cy + 140, 360, 78, 0x2563eb, "START");
+    startBtn.on("pointerdown", () => {
+      // MUST be in the user gesture
+      this.tryFullscreenAndLandscape();
+
+      // Start game
       this.scene.start("GameScene");
       this.scene.launch("UIScene");
+
+      // If still portrait, show overlay (device rotate)
+      this.ensureRotateOverlay();
+      this.updateRotateOverlay();
     });
 
-    const settingsBtn = this.makeButton(cx, cy + 250, 380, 70, 0x111827, "SETTINGS");
-    settingsBtn.onClick(() => this.openSettings());
+    this.scale.on("resize", () => {
+      this.applyContainCamera();
+      this.updateRotateOverlay();
+    });
 
-    const creditsBtn = this.makeButton(cx, cy + 335, 380, 70, 0x111827, "CREDITS");
-    creditsBtn.onClick(() => this.openCredits());
+    window.addEventListener("orientationchange", () => this.updateRotateOverlay());
+    window.addEventListener("resize", () => this.updateRotateOverlay());
+  }
 
-    this.scale.on("resize", () => this.applyContainCamera());
+  tryFullscreenAndLandscape() {
+    const el = document.getElementById("game") || document.documentElement;
+
+    // Fullscreen
+    try {
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (req && !document.fullscreenElement && !document.webkitFullscreenElement) {
+        req.call(el);
+      }
+    } catch (_) {}
+
+    // Orientation lock (only works on some browsers/devices)
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock("landscape").catch(() => {});
+      }
+    } catch (_) {}
+  }
+
+  ensureRotateOverlay() {
+    if (this._rotateOverlay) return;
+
+    const cx = BASE_W / 2;
+    const cy = BASE_H / 2;
+
+    const overlay = this.add.container(0, 0).setDepth(99999);
+
+    const dim = this.add.rectangle(cx, cy, BASE_W, BASE_H, 0x000000, 0.72).setOrigin(0.5);
+    overlay.add(dim);
+
+    const card = this.add.rectangle(cx, cy, 640, 260, 0x0b1220, 0.98)
+      .setOrigin(0.5)
+      .setStrokeStyle(2, 0x334155, 1);
+    overlay.add(card);
+
+    const title = this.add.text(cx, cy - 55, "ROTATE TO LANDSCAPE", {
+      fontSize: "38px",
+      color: "#ffffff",
+      fontStyle: "900"
+    }).setOrigin(0.5);
+    overlay.add(title);
+
+    const body = this.add.text(cx, cy + 30, "Rotate your phone for best experience.", {
+      fontSize: "26px",
+      color: "#cbd5e1",
+      align: "center"
+    }).setOrigin(0.5);
+    overlay.add(body);
+
+    this._rotateOverlay = overlay;
+  }
+
+  updateRotateOverlay() {
+    if (!this._rotateOverlay) return;
+
+    const w = window.innerWidth || 0;
+    const h = window.innerHeight || 0;
+    const isLandscape = w > h;
+
+    // If already landscape, hide overlay
+    this._rotateOverlay.setVisible(!isLandscape);
   }
 
   makeButton(x, y, w, h, fill, label) {
-    const bg = this.add.rectangle(x, y, w, h, fill, 1).setOrigin(0.5).setStrokeStyle(2, 0x334155, 1);
-    const txt = this.add.text(x, y, label, {
-      fontSize: "30px",
-      color: "#ffffff",
-      fontStyle: "700"
-    }).setOrigin(0.5);
+    const c = this.add.container(x, y);
 
-    bg.setInteractive({ useHandCursor: true });
+    const bg = this.add.rectangle(0, 0, w, h, fill, 1).setOrigin(0.5).setStrokeStyle(2, 0x334155, 1);
+    const txt = this.add.text(0, 0, label, { fontSize: "30px", color: "#ffffff", fontStyle: "800" }).setOrigin(0.5);
 
-    return {
-      onClick: (fn) => {
-        bg.on("pointerdown", fn);
-      }
-    };
-  }
+    c.add([bg, txt]);
+    c.setSize(w, h);
+    c.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
 
-  async tryFullscreenAndLandscape() {
-    try {
-      const el = document.documentElement;
-      if (el.requestFullscreen && !document.fullscreenElement) {
-        await el.requestFullscreen();
-      }
-    } catch (_) {}
-
-    try {
-      if (screen.orientation && screen.orientation.lock) {
-        await screen.orientation.lock("landscape");
-      }
-    } catch (_) {}
-  }
-
-  openSettings() {
-    this.closeModal();
-
-    const cx = BASE_W / 2;
-    const cy = BASE_H / 2;
-
-    const modal = this.add.container(0, 0);
-    modal.add(this.add.rectangle(cx, cy, BASE_W, BASE_H, 0x000000, 0.65).setOrigin(0.5));
-
-    modal.add(this.add.rectangle(cx, cy, 600, 520, 0x0b1220, 0.97).setOrigin(0.5).setStrokeStyle(2, 0x334155, 1));
-    modal.add(this.add.text(cx, cy - 210, "SETTINGS", { fontSize: "42px", color: "#ffffff", fontStyle: "800" }).setOrigin(0.5));
-
-    const muteLabel = this.add.text(cx - 190, cy - 120, "Mute", { fontSize: "28px", color: "#cbd5e1" }).setOrigin(0, 0.5);
-    modal.add(muteLabel);
-
-    const muteBtnBg = this.add.rectangle(cx + 200, cy - 120, 220, 56, 0x111827, 1).setOrigin(0.5).setStrokeStyle(2, 0x334155, 1);
-    const muteBtnText = this.add.text(cx + 200, cy - 120, loadMute() ? "ON" : "OFF", { fontSize: "28px", color: "#ffffff", fontStyle: "700" }).setOrigin(0.5);
-    modal.add(muteBtnBg);
-    modal.add(muteBtnText);
-
-    muteBtnBg.setInteractive({ useHandCursor: true });
-    muteBtnBg.on("pointerdown", () => {
-      const next = !loadMute();
-      saveMute(next);
-      this.sound.mute = next;
-      muteBtnText.setText(next ? "ON" : "OFF");
-    });
-
-    const volLabel = this.add.text(cx - 190, cy - 40, "Volume", { fontSize: "28px", color: "#cbd5e1" }).setOrigin(0, 0.5);
-    modal.add(volLabel);
-
-    const sliderW = 360;
-    const sliderH = 16;
-
-    const volBg = this.add.rectangle(cx + 60, cy - 40, sliderW, sliderH, 0x111827, 1).setOrigin(0.5).setStrokeStyle(2, 0x334155, 1);
-    modal.add(volBg);
-
-    const fill = this.add.rectangle(cx + 60 - sliderW / 2, cy - 40, sliderW * loadVolume(), sliderH, 0x2563eb, 1).setOrigin(0, 0.5);
-    modal.add(fill);
-
-    const knob = this.add.circle((cx + 60 - sliderW / 2) + sliderW * loadVolume(), cy - 40, 11, 0xffffff, 1);
-    modal.add(knob);
-
-    const applyVol = (pointerX) => {
-      const left = (cx + 60) - (sliderW / 2);
-      const t = (pointerX - left) / sliderW;
-      const v = Math.max(0, Math.min(1, t));
-      saveVolume(v);
-      this.sound.volume = v;
-
-      fill.width = sliderW * v;
-      knob.x = left + sliderW * v;
-    };
-
-    volBg.setInteractive({ useHandCursor: true });
-    volBg.on("pointerdown", (p) => applyVol(p.x));
-    this.input.on("pointermove", (p) => {
-      if (!this._dragVol) return;
-      applyVol(p.x);
-    });
-    this.input.on("pointerup", () => { this._dragVol = false; });
-
-    volBg.on("pointerdown", (p) => { this._dragVol = true; applyVol(p.x); });
-
-    const closeBtn = this.makeModalButton(cx, cy + 200, "CLOSE");
-    closeBtn.bg.on("pointerdown", () => this.closeModal());
-    modal.add(closeBtn.bg);
-    modal.add(closeBtn.txt);
-
-    this._modal = modal;
-  }
-
-  openCredits() {
-    this.closeModal();
-
-    const cx = BASE_W / 2;
-    const cy = BASE_H / 2;
-
-    const modal = this.add.container(0, 0);
-    modal.add(this.add.rectangle(cx, cy, BASE_W, BASE_H, 0x000000, 0.65).setOrigin(0.5));
-
-    modal.add(this.add.rectangle(cx, cy, 600, 520, 0x0b1220, 0.97).setOrigin(0.5).setStrokeStyle(2, 0x334155, 1));
-    modal.add(this.add.text(cx, cy - 210, "CREDITS", { fontSize: "42px", color: "#ffffff", fontStyle: "800" }).setOrigin(0.5));
-
-    modal.add(this.add.text(cx, cy - 60,
-      "Endless Runner\nBuilt with Phaser 3\n\nDesign / Code: Your Team\nArt: Your Assets\nAudio: Your Assets",
-      { fontSize: "28px", color: "#cbd5e1", align: "center", lineSpacing: 10 }
-    ).setOrigin(0.5));
-
-    const closeBtn = this.makeModalButton(cx, cy + 200, "CLOSE");
-    closeBtn.bg.on("pointerdown", () => this.closeModal());
-    modal.add(closeBtn.bg);
-    modal.add(closeBtn.txt);
-
-    this._modal = modal;
-  }
-
-  makeModalButton(x, y, label) {
-    const bg = this.add.rectangle(x, y, 260, 70, 0x16a34a, 1).setOrigin(0.5).setStrokeStyle(2, 0x14532d, 1);
-    const txt = this.add.text(x, y, label, { fontSize: "30px", color: "#ffffff", fontStyle: "800" }).setOrigin(0.5);
-    bg.setInteractive({ useHandCursor: true });
-    return { bg, txt };
-  }
-
-  closeModal() {
-    if (this._modal) {
-      this._modal.destroy(true);
-      this._modal = null;
-    }
+    return c;
   }
 
   applyContainCamera() {
