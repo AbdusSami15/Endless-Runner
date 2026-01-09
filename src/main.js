@@ -22,6 +22,6 @@ window.game = new Phaser.Game({
     PreloadScene,
     MenuScene,
     GameScene,
-    UIScene
+   // UIScene
   ]
 });

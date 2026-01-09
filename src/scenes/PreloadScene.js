@@ -15,9 +15,13 @@ window.PreloadScene = class PreloadScene extends Phaser.Scene {
 
     // Obstacles
     this.load.image("obs_bird", "./assets/obstacles/bird.png");
-    this.load.image("obs_spike", "./assets/obstacles/spike.png");
 
-    // Player run frames (assets/player/run/1.png ... 16.png)
+    // NEW: Animated ground enemy frames (assets/obstacles/1.png..6.png)
+    for (let i = 1; i <= 6; i++) {
+      this.load.image(`enemy${i}`, `./assets/obstacles/${i}.png`);
+    }
+
+    // Player frames (assets/player/run/1.png..16.png)
     for (let i = 1; i <= 16; i++) {
       this.load.image(`run${i}`, `./assets/player/run/${i}.png`);
     }
@@ -48,6 +52,23 @@ window.PreloadScene = class PreloadScene extends Phaser.Scene {
         frames: [{ key: "run12" }, { key: "run13" }, { key: "run14" }],
         frameRate: 10,
         repeat: 0
+      });
+    }
+
+    // NEW: Enemy obstacle animation (1..6)
+    if (!this.anims.exists("enemy_walk")) {
+      this.anims.create({
+        key: "enemy_walk",
+        frames: [
+          { key: "enemy1" },
+          { key: "enemy2" },
+          { key: "enemy3" },
+          { key: "enemy4" },
+          { key: "enemy5" },
+          { key: "enemy6" }
+        ],
+        frameRate: 10,
+        repeat: -1
       });
     }
 
