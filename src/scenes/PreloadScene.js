@@ -1,5 +1,7 @@
 window.PreloadScene = class PreloadScene extends Phaser.Scene {
-  constructor() { super("PreloadScene"); }
+  constructor() {
+    super("PreloadScene");
+  }
 
   preload() {
     // Backgrounds
@@ -8,25 +10,44 @@ window.PreloadScene = class PreloadScene extends Phaser.Scene {
     this.load.image("bg_3", "./assets/bg/3.png");
     this.load.image("bg_4", "./assets/bg/4.png");
 
+    // Ground
     this.load.image("ground", "./assets/ground.png");
 
-    // 🔥 CORRECT sprite-sheet slicing (800x700, 4x4)
-    this.load.spritesheet("player_run", "./assets/player/run.png", {
-      frameWidth: 200,
-      frameHeight: 175
-    });
+    // Obstacles
+    this.load.image("obs_bird", "./assets/obstacles/bird.png");
+    this.load.image("obs_spike", "./assets/obstacles/spike.png");
+
+    // Player run frames (assets/player/run/1.png ... 16.png)
+    for (let i = 1; i <= 16; i++) {
+      this.load.image(`run${i}`, `./assets/player/run/${i}.png`);
+    }
   }
 
   create() {
-    if (!this.anims.exists("run")) {
+    // RUN animation (6..11)
+    if (!this.anims.exists("player_run")) {
       this.anims.create({
-        key: "run",
-        frames: this.anims.generateFrameNumbers("player_run", {
-          start: 0,
-          end: 15   // 16 frames (0–15)
-        }),
+        key: "player_run",
+        frames: [
+          { key: "run6" },
+          { key: "run7" },
+          { key: "run8" },
+          { key: "run9" },
+          { key: "run10" },
+          { key: "run11" }
+        ],
         frameRate: 12,
         repeat: -1
+      });
+    }
+
+    // JUMP animation (12..14)
+    if (!this.anims.exists("player_jump")) {
+      this.anims.create({
+        key: "player_jump",
+        frames: [{ key: "run12" }, { key: "run13" }, { key: "run14" }],
+        frameRate: 10,
+        repeat: 0
       });
     }
 
