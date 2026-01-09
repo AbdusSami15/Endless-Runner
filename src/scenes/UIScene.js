@@ -25,7 +25,6 @@ window.UIScene = class UIScene extends Phaser.Scene {
       color: "#ffffff"
     }).setScrollFactor(0).setDepth(20000).setAlpha(0.7);
 
-    // Listen events from GameScene
     const game = this.scene.get("GameScene");
 
     game.events.on("score", (v) => {

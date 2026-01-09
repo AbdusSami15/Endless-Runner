@@ -11,6 +11,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
     this.aliveMs = 0;
 
     this.isJumping = false;
+    this._restarting = false;
 
     this.obstaclePool = [];
     this._distAcc = 0;
@@ -19,7 +20,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
     this.bgLayers = [];
 
     this.obstacleDefs = {
-      obs_enemy: { type: "ground", scale: 1, body: { w: 60, h: 80 }, groundOffset: 70 },
+      obs_enemy: { type: "ground", scale: 1, body: { w: 60, h: 80 }, groundOffset: 70 }, // tune 6..14
       obs_bird: { type: "air", scale: 1, body: { w: 80, h: 60 } }
     };
 
@@ -31,13 +32,32 @@ window.GameScene = class GameScene extends Phaser.Scene {
   }
 
   create() {
+    // ---- Clean old listeners / tweens (important on restart) ----
     this.input.removeAllListeners();
     this.tweens.killAll();
 
+    // ---- HARD RESET STATE (fix restart stuck) ----
+    this.isGameOver = false;
+    this.isJumping = false;
+    this._restarting = false;
+
+    this.speed = SETTINGS.startSpeed;
+    this.score = 0;
+    this.lastGroundedAt = 0;
+    this.jumpBufferedAt = -99999;
+    this.aliveMs = 0;
+
+    this._distAcc = 0;
+    this._gapTarget = 0;
+
+    // Clear pools to avoid weird reuse after restart
+    this.obstaclePool.length = 0;
+
+    // ---- Camera / World ----
     this.applyCoverCamera();
     this.physics.world.setBounds(0, 0, BASE_W, BASE_H);
 
-    // Ground
+    // ---- Ground ----
     const groundImg = this.textures.get("ground").getSourceImage();
     const groundScaleX = BASE_W / groundImg.width;
     const groundScaleY = SETTINGS.groundHeight / groundImg.height;
@@ -47,10 +67,10 @@ window.GameScene = class GameScene extends Phaser.Scene {
     this.ground.setScale(groundScaleX, groundScaleY).refreshBody();
     this.groundTopY = this.ground.getTopCenter().y;
 
-    // Background
+    // ---- Background ----
     this.addBackground();
 
-    // Player
+    // ---- Player ----
     this.player = this.physics.add.sprite(150, this.groundTopY, "run6");
     this.player.setOrigin(0.5, 1);
     this.player.setDepth(20);
@@ -65,18 +85,20 @@ window.GameScene = class GameScene extends Phaser.Scene {
 
     this.physics.add.collider(this.player, this.ground);
 
-    // Obstacles group
+    // ---- Obstacles group ----
     this.obstacles = this.physics.add.group({ allowGravity: false });
     this.physics.add.overlap(this.player, this.obstacles, () => {
       if (!this.isGameOver) this.gameOver();
     });
 
-    // Input priority
+    // ---- Input ----
     this.input.topOnly = true;
+    this.input.enabled = true;
 
     // Tap hint
     this.createTapToJumpHint();
 
+    // Jump input
     this.input.on("pointerdown", () => {
       if (this.isGameOver) return;
 
@@ -105,12 +127,11 @@ window.GameScene = class GameScene extends Phaser.Scene {
       this.relayoutTapHint();
     });
 
-    // Spawn init
-    this._distAcc = 0;
+    // ---- Spawn init ----
     this._gapTarget = this.pickGapPx();
     this.spawnObstacle();
 
-    // HUD
+    // ---- HUD events ----
     this.events.emit("score", 0);
     this.events.emit("speed", this.speed);
     this.events.emit("best", loadHighScore());
@@ -131,7 +152,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
     // Grounded tracking
     if (this.player.body.blocked.down) this.lastGroundedAt = this.time.now;
 
-    // Animation state control (prevents run overriding jump)
+    // Animation state: prevents run overriding jump
     if (this.player.body.blocked.down) {
       if (this.isJumping) this.isJumping = false;
 
@@ -214,7 +235,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
       o.setPosition(BASE_W + SETTINGS.obstacleXPad, this.groundTopY + groundOffset);
     }
 
-    // Body size (bottom-aligned to avoid floating)
+    // Body (bottom aligned so it doesn't float)
     const bw = def.body.w;
     const bh = def.body.h;
     o.body.setSize(bw, bh, true);
@@ -284,6 +305,10 @@ window.GameScene = class GameScene extends Phaser.Scene {
       color: "#ffffff",
       fontStyle: "bold"
     }).setOrigin(0.5).setScrollFactor(0).setDepth(9001);
+
+    // Ensure not interactive (never block clicks)
+    this.tapHintBg.disableInteractive?.();
+    this.tapHint.disableInteractive?.();
 
     this.tweens.add({
       targets: this.tapHint,
@@ -396,8 +421,8 @@ window.GameScene = class GameScene extends Phaser.Scene {
 
     const layer = this.add.container(0, 0).setDepth(10000).setScrollFactor(0);
 
+    // IMPORTANT: blocker is NOT interactive (so it won't eat button clicks)
     const blocker = this.add.rectangle(BASE_W / 2, BASE_H / 2, BASE_W, BASE_H, 0x000000, 0.45)
-      .setInteractive(new Phaser.Geom.Rectangle(0, 0, BASE_W, BASE_H), Phaser.Geom.Rectangle.Contains)
       .setScrollFactor(0);
 
     const panelW = 520;
@@ -421,15 +446,46 @@ window.GameScene = class GameScene extends Phaser.Scene {
     const btnY = BASE_H / 2 + 70;
 
     const restartBtn = this.makeButton(BASE_W / 2 - 130, btnY, 220, 56, "RESTART", () => {
-      this.scene.restart();
+      if (this._restarting) return;
+      this._restarting = true;
+
+      this.input.enabled = false;
+
+      if (this.gameOverUI) {
+        this.gameOverUI.destroy(true);
+        this.gameOverUI = null;
+      }
+
+      if (this.obstacles) this.obstacles.clear(true, true);
+      this.obstaclePool.length = 0;
+
+      this.time.delayedCall(0, () => {
+        this.input.enabled = true;
+        this.scene.restart();
+      });
     });
 
     const menuBtn = this.makeButton(BASE_W / 2 + 130, btnY, 220, 56, "MENU", () => {
-      this.scene.start("MenuScene");
+      if (this._restarting) return;
+      this._restarting = true;
+
+      this.input.enabled = false;
+
+      if (this.gameOverUI) {
+        this.gameOverUI.destroy(true);
+        this.gameOverUI = null;
+      }
+
+      if (this.obstacles) this.obstacles.clear(true, true);
+      this.obstaclePool.length = 0;
+
+      this.time.delayedCall(0, () => {
+        this.input.enabled = true;
+        this.scene.start("MenuScene");
+      });
     });
 
     layer.add([blocker, panel, title, info, restartBtn.container, menuBtn.container]);
-
     this.gameOverUI = layer;
   }
 

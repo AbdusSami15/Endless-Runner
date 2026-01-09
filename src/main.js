@@ -1,18 +1,19 @@
-window.game = new Phaser.Game({
+const config = {
   type: Phaser.AUTO,
-  parent: "game",
-  backgroundColor: "#0b0f14",
+  parent: "game-container",
+  width: BASE_W,
+  height: BASE_H,
+  backgroundColor: "#000000",
 
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: BASE_W,
-    height: BASE_H
+    mode: Phaser.Scale.RESIZE,      // 🔥 key fix
+    autoCenter: Phaser.Scale.CENTER_BOTH
   },
 
   physics: {
     default: "arcade",
     arcade: {
+      gravity: { y: 0 },
       debug: false
     }
   },
@@ -22,6 +23,8 @@ window.game = new Phaser.Game({
     PreloadScene,
     MenuScene,
     GameScene,
-   // UIScene
+    UIScene
   ]
-});
+};
+
+window.game = new Phaser.Game(config);
